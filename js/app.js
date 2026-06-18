@@ -285,7 +285,7 @@
     } catch (_) {
       session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) })
     }
-    renderer.setClearColor(0x000000, 0)
+    renderer.autoClearColor = false
     let refSpace = await session.requestReferenceSpace('local')
 
     const reticle = new THREE.Mesh(
