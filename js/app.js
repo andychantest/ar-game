@@ -264,9 +264,11 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.xr.enabled = true
+    renderer.setClearColor(0x000000, 0)
     document.body.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
+    scene.background = null
     const camera = new THREE.PerspectiveCamera()
     camera.matrixAutoUpdate = false
 
