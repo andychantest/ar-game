@@ -251,20 +251,22 @@
     let session
     try {
       session = await navigator.xr.requestSession('immersive-ar', {
-        requiredFeatures: ['plane-detection', 'hit-test'],
+        optionalFeatures: ['plane-detection', 'hit-test'],
       })
     } catch (err) {
-      setStatus('啟動 AR 失敗：' + (err.message || '')); return
+      setStatus('啟動 AR 失敗：' + (err.message || ''))
+      arButton.style.display = 'block'
+      arButton.textContent = '重試'
+      return
     }
 
     arButton.style.display = 'none'
-    if (statusText) statusText.style.display = 'none'
+    setStatus('AR 已啟動')
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.xr.enabled = true
-    renderer.setClearColor(0x000000, 0)
     document.body.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
@@ -278,6 +280,7 @@
     scene.add(new THREE.AmbientLight(0x8888ff, 0.3))
 
     await renderer.xr.setSession(session)
+    renderer.setClearColor(0x000000, 0)
 
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.06, 0.08, 24),
@@ -296,11 +299,18 @@
     document.body.appendChild(hint)
 
     let hitTestSource = null
+    let vs
     try {
-      const vs = await session.requestReferenceSpace('viewer')
-      hitTestSource = await session.requestHitTestSource({ space: vs, entityTypes: ['plane'] })
-    } catch (_) {
-      hint.textContent = '無法使用 Hit Test'
+      vs = await session.requestReferenceSpace('viewer')
+    } catch (_) {}
+    if (vs) {
+      try {
+        hitTestSource = await session.requestHitTestSource({ space: vs, entityTypes: ['plane'] })
+      } catch (_) {
+        try {
+          hitTestSource = await session.requestHitTestSource({ space: vs })
+        } catch (_2) {}
+      }
     }
 
     let pendingPlace = false
@@ -356,6 +366,21 @@
           }
         }
         if (!hit) reticle.visible = false
+      }
+
+      if (pendingPlace && !hitTestSource) {
+        pendingPlace = false
+        const vp = frame.getViewerPose(refSpace)
+        if (vp) {
+          const pos = vp.transform.position.clone()
+          const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(vp.transform.orientation)
+          dir.y = 0; dir.normalize()
+          pos.add(dir.multiplyScalar(1.5)); pos.y = 0
+          const q = new THREE.Quaternion()
+          q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().negate())
+          placeMonster(monster, pos, q)
+        }
+        hint.classList.remove('visible')
       }
 
       if (monster.visible) {
