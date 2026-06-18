@@ -353,9 +353,14 @@
       }
     }
 
+    let frameCount = 0
     renderer.setAnimationLoop((time, frame) => {
-      if (sessionEnded || !frame) { renderer.render(scene, camera); return }
       const refSpace = renderer.xr.getReferenceSpace()
+      if (!frame || !refSpace) { return }
+
+      frameCount++
+      if (frameCount % 30 === 0) setStatus('AR 運行中 (frame:' + frameCount + ')')
+
       updatePlanes(frame, refSpace)
 
       if (hitTestSource) {
