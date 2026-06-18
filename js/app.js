@@ -263,7 +263,7 @@
     arButton.style.display = 'none'
     setStatus('AR 已啟動')
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.xr.enabled = true
@@ -280,13 +280,7 @@
     scene.add(new THREE.AmbientLight(0x8888ff, 0.3))
 
     await renderer.xr.setSession(session)
-
-    const xrRefSpace = renderer.xr.getReferenceSpace()
-    if (xrRefSpace && xrRefSpace.type !== 'local-floor') {
-      session.requestReferenceSpace('local-floor').catch(() => {}).then((rs) => {
-        if (rs) renderer.xr.setReferenceSpace(rs)
-      })
-    }
+    renderer.setClearColor(0x000000, 0)
 
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.06, 0.08, 24),
