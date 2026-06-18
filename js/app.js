@@ -279,7 +279,13 @@
     scene.add(dl)
     scene.add(new THREE.AmbientLight(0x8888ff, 0.3))
 
-    await renderer.xr.setSession(session)
+    try {
+      await renderer.xr.setSession(session)
+    } catch (xrErr) {
+      hint.textContent = 'XR 設定失敗: ' + xrErr.message
+      hint.classList.add('visible')
+      return
+    }
     renderer.setClearColor(0x000000, 0)
 
     const reticle = new THREE.Mesh(
@@ -354,12 +360,15 @@
     }
 
     let frameCount = 0
-    renderer.setAnimationLoop((time, frame) => {
-      const refSpace = renderer.xr.getReferenceSpace()
-      if (!frame || !refSpace) { return }
+    function onXRFrame(time, frame) {
+      session.requestAnimationFrame(onXRFrame)
 
       frameCount++
-      if (frameCount % 30 === 0) setStatus('AR 運行中 (frame:' + frameCount + ')')
+      hint.textContent = 'AR frame:' + frameCount
+      hint.classList.add('visible')
+
+      const refSpace = renderer.xr.getReferenceSpace()
+      if (!frame || !refSpace) { return }
 
       updatePlanes(frame, refSpace)
 
@@ -375,6 +384,8 @@
             if (pendingPlace) {
               placeMonster(monster, pose.transform.position, pose.transform.orientation)
               pendingPlace = false; hint.classList.remove('visible')
+              hint.textContent = '怪物已放置！'
+              hint.classList.add('visible')
             }
           }
         }
@@ -401,6 +412,7 @@
         monster.rotation.y += 0.002
       }
       renderer.render(scene, camera)
-    })
+    }
+    session.requestAnimationFrame(onXRFrame)
   }
 })()
