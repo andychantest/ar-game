@@ -266,28 +266,27 @@
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.xr.enabled = true
     document.body.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
     scene.background = null
     const camera = new THREE.PerspectiveCamera()
-    camera.matrixAutoUpdate = false
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.8))
     const dl = new THREE.DirectionalLight(0xffffff, 0.6); dl.position.set(2, 3, 1)
     scene.add(dl)
     scene.add(new THREE.AmbientLight(0x8888ff, 0.3))
 
+    // Manual XR setup (no Three.js XR manager)
+    const gl = renderer.getContext()
     try {
-      await renderer.xr.setSession(session)
-    } catch (xrErr) {
-      setStatus('XR 錯誤: ' + xrErr.message)
-      arButton.style.display = 'block'
-      arButton.textContent = '重試'
-      return
+      const binding = new XRWebGLBinding(session, gl)
+      session.updateRenderState({ layers: [binding.createProjectionLayer()] })
+    } catch (_) {
+      session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) })
     }
     renderer.setClearColor(0x000000, 0)
+    let refSpace = await session.requestReferenceSpace('local')
 
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.06, 0.08, 24),
@@ -369,8 +368,16 @@
       frameCount++
       setStatus('AR frame #' + frameCount + ' ✓')
 
-      const refSpace = renderer.xr.getReferenceSpace()
       if (!frame || !refSpace) { return }
+
+      const viewerPose = frame.getViewerPose(refSpace)
+      if (viewerPose) {
+        const view = viewerPose.views[0]
+        camera.position.set(view.transform.position.x, view.transform.position.y, view.transform.position.z)
+        camera.quaternion.set(view.transform.orientation.x, view.transform.orientation.y, view.transform.orientation.z, view.transform.orientation.w)
+        camera.projectionMatrix.fromArray(view.projectionMatrix)
+        camera.updateMatrix()
+      }
 
       updatePlanes(frame, refSpace)
 
