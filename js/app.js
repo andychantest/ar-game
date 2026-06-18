@@ -282,8 +282,9 @@
     try {
       await renderer.xr.setSession(session)
     } catch (xrErr) {
-      hint.textContent = 'XR 設定失敗: ' + xrErr.message
-      hint.classList.add('visible')
+      setStatus('XR 錯誤: ' + xrErr.message)
+      arButton.style.display = 'block'
+      arButton.textContent = '重試'
       return
     }
     renderer.setClearColor(0x000000, 0)
@@ -360,12 +361,13 @@
     }
 
     let frameCount = 0
+    let frameReceived = false
     function onXRFrame(time, frame) {
+      frameReceived = true
       session.requestAnimationFrame(onXRFrame)
 
       frameCount++
-      hint.textContent = 'AR frame:' + frameCount
-      hint.classList.add('visible')
+      setStatus('AR frame #' + frameCount + ' ✓')
 
       const refSpace = renderer.xr.getReferenceSpace()
       if (!frame || !refSpace) { return }
@@ -413,6 +415,14 @@
       }
       renderer.render(scene, camera)
     }
-    session.requestAnimationFrame(onXRFrame)
+    try {
+      session.requestAnimationFrame(onXRFrame)
+    } catch (rafErr) {
+      setStatus('XR RAF 錯誤: ' + rafErr.message)
+      return
+    }
+    setTimeout(() => {
+      if (!frameReceived) setStatus('⚠ 5 秒 XR frame 逾時')
+    }, 5000)
   }
 })()
