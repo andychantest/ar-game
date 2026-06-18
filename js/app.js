@@ -263,7 +263,7 @@
     arButton.style.display = 'none'
     setStatus('AR 已啟動')
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.xr.enabled = true
@@ -280,7 +280,13 @@
     scene.add(new THREE.AmbientLight(0x8888ff, 0.3))
 
     await renderer.xr.setSession(session)
-    renderer.setClearColor(0x000000, 0)
+
+    const xrRefSpace = renderer.xr.getReferenceSpace()
+    if (xrRefSpace && xrRefSpace.type !== 'local-floor') {
+      session.requestReferenceSpace('local-floor').catch(() => {}).then((rs) => {
+        if (rs) renderer.xr.setReferenceSpace(rs)
+      })
+    }
 
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.06, 0.08, 24),
@@ -292,6 +298,14 @@
 
     const monster = createMonster()
     scene.add(monster)
+
+    // Debug: red cube at origin (visible immediately, no hit test needed)
+    const debugCube = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.1, 0.1),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    )
+    debugCube.position.set(0, 0, -1.5)
+    scene.add(debugCube)
 
     const hint = document.createElement('div')
     hint.id = 'ar-hint'
