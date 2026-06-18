@@ -1,11 +1,11 @@
+import * as THREE from 'three'
+
 ;(async () => {
   const statusText = document.getElementById('status-text')
   const arButton = document.getElementById('ar-button')
   const video = document.getElementById('video')
 
   const setStatus = (t) => { if (statusText) statusText.textContent = t }
-
-  if (typeof THREE === 'undefined') { setStatus('Three.js 載入失敗'); return }
 
   // ── Decide path: WebXR vs Desktop ──
   const webXRAvailable = navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')
@@ -266,27 +266,21 @@
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.xr.enabled = true
     document.body.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
     scene.background = null
     const camera = new THREE.PerspectiveCamera()
+    camera.matrixAutoUpdate = false
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.8))
     const dl = new THREE.DirectionalLight(0xffffff, 0.6); dl.position.set(2, 3, 1)
     scene.add(dl)
     scene.add(new THREE.AmbientLight(0x8888ff, 0.3))
 
-    // Manual XR setup (no Three.js XR manager)
-    const gl = renderer.getContext()
-    try {
-      const binding = new XRWebGLBinding(session, gl)
-      session.updateRenderState({ layers: [binding.createProjectionLayer()] })
-    } catch (_) {
-      session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) })
-    }
-    renderer.autoClearColor = false
-    let refSpace = await session.requestReferenceSpace('local')
+    await renderer.xr.setSession(session)
+    renderer.setClearColor(0x000000, 0)
 
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.06, 0.08, 24),
@@ -359,26 +353,9 @@
       }
     }
 
-    let frameCount = 0
-    let frameReceived = false
-    function onXRFrame(time, frame) {
-      frameReceived = true
-      session.requestAnimationFrame(onXRFrame)
-
-      frameCount++
-      setStatus('AR frame #' + frameCount + ' ✓')
-
-      if (!frame || !refSpace) { return }
-
-      const viewerPose = frame.getViewerPose(refSpace)
-      if (viewerPose) {
-        const view = viewerPose.views[0]
-        camera.position.set(view.transform.position.x, view.transform.position.y, view.transform.position.z)
-        camera.quaternion.set(view.transform.orientation.x, view.transform.orientation.y, view.transform.orientation.z, view.transform.orientation.w)
-        camera.projectionMatrix.fromArray(view.projectionMatrix)
-        camera.updateMatrix()
-      }
-
+    renderer.setAnimationLoop((time, frame) => {
+      if (sessionEnded || !frame) { renderer.render(scene, camera); return }
+      const refSpace = renderer.xr.getReferenceSpace()
       updatePlanes(frame, refSpace)
 
       if (hitTestSource) {
@@ -393,8 +370,6 @@
             if (pendingPlace) {
               placeMonster(monster, pose.transform.position, pose.transform.orientation)
               pendingPlace = false; hint.classList.remove('visible')
-              hint.textContent = '怪物已放置！'
-              hint.classList.add('visible')
             }
           }
         }
@@ -421,15 +396,6 @@
         monster.rotation.y += 0.002
       }
       renderer.render(scene, camera)
-    }
-    try {
-      session.requestAnimationFrame(onXRFrame)
-    } catch (rafErr) {
-      setStatus('XR RAF 錯誤: ' + rafErr.message)
-      return
-    }
-    setTimeout(() => {
-      if (!frameReceived) setStatus('⚠ 5 秒 XR frame 逾時')
-    }, 5000)
+    })
   }
 })()
